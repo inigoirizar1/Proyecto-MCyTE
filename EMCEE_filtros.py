@@ -151,10 +151,6 @@ def interpolate_model(lon,londism,mod):# Interpolamos el modelo.
 	interpolated_y = np.interp(lon,londism,mod)	
         return interpolated_y
 
-def create_delta(interpolated_y):
-	iparf = read_obs()	
-	return iparf - interpolated_y
-
 def insert_noise(y):
         noisy_y = []
         for item in y:
@@ -163,7 +159,7 @@ def insert_noise(y):
             noisy_y.append(value22)        
         return noisy_y
 
-def func(x, T1, P2, T2, P3, value1, value2):
+def func(x, T1, P2, T2, P3, value1, value2):# Model with noise.
 	values = []
         mu, mu0, deltaphi = read_scattering_angles()
 	write_model(mu, mu0, deltaphi, T1, P2, T2, P3, value1, value2)
@@ -180,6 +176,16 @@ def optimize():
         T1_ml, T2_ml, P3_ml, omega_ml = result["x"]
         return result["x"]
 
+def model1(x, T1, P2, T2, P3, value1, value2):# Model without noise.
+	values = []
+        mu, mu0, deltaphi = read_scattering_angles()
+	write_model(mu, mu0, deltaphi, T1, P2, T2, P3, value1, value2)
+	execute_atmos()
+        lon, iparf, muobs, mu0obs = read_obs()
+        mod,londism = read_pointsdat()
+        interpolated_y = interpolate_model(lon,londism,mod)
+	return interpolated_y
+
 def calculate_diference(x, T1_true, P2_true, T2_true, P3_true, T1_ml, P2_ml, T2_ml, P3_ml, value1, value2, yerr):
         values = []
         y = func(x, T1_true, P2_true, T2_true, P3_true, value1, value2)
@@ -194,6 +200,7 @@ def create_comparison_plot(x, T1_true, P2_true, T2_true, P3_true, T1_ml, P2_ml, 
         Chi2_values = []
         errorbar = []
         y = func(x, T1_true, P2_true, T2_true, P3_true, value1, value2)
+        y1 = model1(x, T1_true, P2_true, T2_true, P3_true, value1, value2)
         model = func(x, T1_ml, P2_ml, T2_ml, P3_ml, value1, value2)
         for item in model:
             value = 0.05*item
@@ -207,10 +214,11 @@ def create_comparison_plot(x, T1_true, P2_true, T2_true, P3_true, T1_ml, P2_ml, 
         gs = gridspec.GridSpec(2,1 ,height_ratios=[10,4])
         ax1 = plt.subplot(gs[0])
         ax1.plot(x,y,'-',label = 'observations')
+        ax1.plot(x,y1,'-',label=  'initial guess')
         #ax1.errorbar(x,model,yerr=errorbar)
         ax1.plot(x,model,'-',label = 'model')
         ax1.legend()
-        #ax1.title('Error:'+ str(suma1))
+        plt.title("Error:"+ str(suma1))
         plt.ylabel('I/F')
         ax2 = plt.subplot(gs[1])
         ax2.plot(x,Chi2_values,'-',label = '$\chi^2$')
@@ -231,7 +239,7 @@ def lnprior(theta):
 def lnlike(theta, x, y, yerr):#inserta la definicon de yerr en algun lado!! He cambiado yerr por sigma!!!!!
         valuesChi2 = []
 	T1, P2, T2, P3 = theta   
-	interpolated_y_noise = func(x, T1, P2, T2, P3, value1, value2)    
+	interpolated_y_noise = func(x, T1, P2, T2, P3, value1, value2)   
 	for k in range(0,np.size(y)):
             item = ((y[k]-interpolated_y_noise[k])/(0.05*y[k]))**2
             valuesChi2.append(item)
